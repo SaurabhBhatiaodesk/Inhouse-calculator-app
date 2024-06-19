@@ -1,0 +1,242 @@
+<style>
+  body {
+    font-family: Arial, sans-serif;
+  }
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    box-shadow: 0px 0px 12px #f3f3f3;
+    background: #fff;
+    border-radius: 4px;
+  }
+
+  .container h2 {
+    margin-top: 0px;
+    margin-bottom: 30px;
+  }
+
+  .input-group {
+    margin-bottom: 10px;
+  }
+
+  .input-group label {
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  .input-group input[type='number'],
+  .input-group input[type='text'],
+  .input-group select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    color: #000000bf;
+  }
+
+  button[type='submit'],
+  button[type='button'] {
+    width: auto;
+    padding: 10px 20px;
+    background-color: orangered;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+
+  .price_count {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-top: 3rem;
+  }
+
+  .price_count h3,
+  .price_count span {
+    font-size: 20px;
+  }
+
+  .price_count span {
+    color: orangered;
+  }
+
+  .add_quentity {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  small {
+    font-size: 12px;
+    color: #000000bf;
+  }
+
+  form#glazed-unit-form {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .input-group {
+    width: 48%;
+  }
+</style>
+
+
+
+
+
+<body>
+  <div class="container">
+    <h2>Double Glazed Unit</h2>
+    <form id="glazed-unit-form">
+      <div class="input-group">
+        <label for="width">Width <span style="font-size:20px; color:red;">*</span></label>
+        <input type="number" id="width" name="width" min="10" placeholder="1000">
+        <small>Min:10 | Max:</small>
+      </div>
+      <div class="input-group">
+        <label for="height">Height<span style="font-size:20px; color:red;">*</span></label>
+        <input type="number" id="height" name="height" min="10" placeholder="1000">
+        <small>Min:10| Max:</small>
+      </div>
+      
+      <span id="showError"></span>
+      <div class="price_count">
+        <h3>Total Price (Excl. Tax)</h3>
+        <span id="total-price">0.00</span>
+      </div>
+     
+      <div class="add_quentity">
+        <button id="calculatePrice" type="button">Calculate</button>
+        <button id="afterCalculate" type="button">Add to cart</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const { host } = window.location;
+    const apiUrl = `https://assessments-stretch-fears-appraisal.trycloudflare.com/api/setPriceDynamic?shop=${host}`;
+
+    const fetchVariantId = {{product.variants.first.id}};
+
+    // Function to fetch data from the API
+    async function fetchData(url) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const responseData = await response.json();
+        return responseData.data;
+      } catch (error) {
+        console.error('Error occurred:', error);
+      }
+    }
+
+    // Function to calculate and update the price
+    function calculatePrice(data) {
+      const widthInput = document.getElementById('width');
+      const heightInput = document.getElementById('height');
+      const totalPriceElement = document.getElementById('total-price');
+      const pricePerUnit = parseFloat(data.UnitsOfMeasurementPrice);
+      const measurementPerUnit = data?.UnitsOfMeasurement;
+
+      console.log(measurementPerUnit, "measurementPerUnit");
+
+      // Function to update the price when calculate button is clicked
+      function updatePrice(event) {
+        event.preventDefault(); // Prevent form submission
+        const width = parseFloat(widthInput.value);
+        const height = parseFloat(heightInput.value);
+
+        if (!isNaN(width) && !isNaN(height) && width > 0 && height > 0) {
+          let areaInM2;
+          switch (measurementPerUnit) {
+            case 'Centimeters (cm)':
+              areaInM2 = (width / 100) * (height / 100);
+              break;
+            case 'Meters (m)':
+              areaInM2 = width * height;
+              break;
+            case 'Millimeters (mm)':
+              areaInM2 = (width / 1000) * (height / 1000);
+              break;
+            case 'Inches (in)':
+              areaInM2 = (width * 0.0254) * (height * 0.0254);
+              break;
+            case 'Feet (ft)':
+              areaInM2 = (width * 0.3048) * (height * 0.3048);
+              break;
+            default:
+              areaInM2 = 0;
+          }
+
+          const totalPrice = areaInM2 * pricePerUnit;
+          const totalPriceFormatted = totalPrice.toFixed(2); // Format the total price
+          totalPriceElement.textContent = `${totalPriceFormatted}`;
+
+          return totalPriceFormatted;
+        }
+      }
+
+      // Add event listener to calculate button
+      const calculateButton = document.getElementById('calculatePrice');
+      calculateButton.addEventListener('click', updatePrice);
+
+      // Add event listener to add to cart button
+      const addToCartButton = document.getElementById('afterCalculate');
+      addToCartButton.addEventListener('click', (event) => {
+        const totalPriceFormatted = updatePrice(event);
+        if (totalPriceFormatted) {
+          callApiAddToCart(totalPriceFormatted);
+        }
+      });
+    }
+
+    // Fetch data and initialize the calculation
+    fetchData(apiUrl).then(data => {
+      if (data) {
+        calculatePrice(data);
+      }
+    });
+
+    // Function to call Shopify API and add item to cart
+    function callApiAddToCart(totalPriceFormatted) {
+      const requestBody = {
+        items: [
+          {
+            id: fetchVariantId,
+            quantity: 1,
+            properties: {
+              _totalPricOfUnits: totalPriceFormatted, // Use the formatted price here
+            },
+          },
+        ],
+      };
+
+      fetch(window.Shopify.routes.root + 'cart/add.js', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Response:', data); 
+          window.location.href =  '/cart';
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
+    }
+  </script>
+</body>
+
+
+
+
+
+
