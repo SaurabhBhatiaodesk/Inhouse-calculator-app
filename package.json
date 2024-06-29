@@ -19,9 +19,6 @@
     "vite": "vite"
   },
   "type": "module",
-  "engines": {
-    "node": "^18.20 || ^20.10 || ^22"
-  },
   "dependencies": {
     "@prisma/client": "^5.11.0",
     "@remix-run/dev": "^2.7.1",
